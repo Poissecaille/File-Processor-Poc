@@ -1,0 +1,33 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "api",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "api.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "listen_file_reception",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "listen_file_reception.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "main(cli)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--files",
+                "documents/test_1.pdf",
+                "documents/test_2.pdf",
+                "--clean",
+                "--create",
+            ]
+        },
+    ]
+}

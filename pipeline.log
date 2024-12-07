@@ -1,0 +1,6 @@
+2024-12-01 17:31:44,196 [INFO] OCR received for test_1.pdf: ['Document de test numéro 1']
+2024-12-01 17:31:47,050 [INFO] Classification received: {'segmentDiag': [], 'segmentOp': [{'categorie': 'etat_hypothecaire', 'pages': [0, 0]}]}
+2024-12-01 17:31:47,059 [INFO] Saved classified segment: results/test_1.pdf_etat_hypothecaire_0-0.pdf
+2024-12-01 17:31:53,598 [INFO] OCR received for test_2.pdf: ['Document de test numéro 2\nPage 1\u2029', 'Page 2']
+2024-12-01 17:31:57,595 [INFO] Classification received: {'segmentDiag': [], 'segmentOp': [{'categorie': 'titre_propriete', 'pages': [0, 1]}]}
+2024-12-01 17:31:57,605 [INFO] Saved classified segment: results/test_2.pdf_titre_propriete_0-1.pdf
