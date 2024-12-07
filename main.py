@@ -16,19 +16,16 @@ from utils import (
     upload_item_to_dynamodb,
 )
 
-# SETTINGS VALUES
-DEFAULT_PATH_TARGET = "results"
-DEFAULT_PATH_ORIGIN = "documents"
 
-
-def main(file_paths: List[str]):
+def main(file_paths: List[str]) -> None:
     for path in file_paths:
         try:
             filename = os.path.basename(path)
             with open(path, "rb") as f:
                 file_content = f.read()
-            # DOCUMENTS RECEPTION ON LOCAL PIPELINE
             upload_file_to_s3(file_content, filename)
+            logger.info(f"file uploaded to s3: filename: {filename}")
+            send_log_to_cloudwatch(f"file uploaded to s3: filename: {filename}")
             file_id = str(uuid4())
             upload_item_to_dynamodb(
                 DYNAMODB_TABLE_NAME,
@@ -37,6 +34,8 @@ def main(file_paths: List[str]):
                     "original_file": {"S": f"s3://files-bucket/{filename}"},
                 },
             )
+            logger.info(f"file uploaded to dynamodb: filename: {filename}")
+            send_log_to_cloudwatch(f"file uploaded to dynamodb: filename: {filename}")
             send_message_to_sqs(
                 SQS_QUEUE_URL,
                 {
@@ -46,15 +45,6 @@ def main(file_paths: List[str]):
                     }
                 },
             )
-
-            # # OCR ANALYSIS
-            # pages = start_ocr_analysis(filename, file_content)
-            # if not pages:
-            #     logger.info("No content was found inside document")
-            #     send_log_to_cloudwatch("No content was found inside document")
-            #     return
-            # classification = send_pages_to_promptflow(pages)
-            # save_classification(filename, file_content, classification, target_folder)
         except FileNotFoundError:
             logger.error(f"File not found: {path}")
             send_log_to_cloudwatch(f"File not found: {path}")
@@ -64,7 +54,6 @@ def main(file_paths: List[str]):
 
 
 if __name__ == "__main__":
-    # response = sqs_client.delete_queue(QueueUrl=SQS_QUEUE_URL)
     parser = argparse.ArgumentParser(description="Analyze documents in the pipeline")
     parser.add_argument(
         "--files",
@@ -81,8 +70,8 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     if not args.files:
-        print("err")
-        raise Exception
+        logger.error(f"cli lacking parameters: {args}")
+        raise Exception("cli lacking parameters")
     if args.clean:
         clean_aws_resources()
     if args.create:

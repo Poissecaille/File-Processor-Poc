@@ -1,17 +1,21 @@
-from datetime import datetime, timezone
-from enum import Enum
+import os
 import io
 import json
 import logging
-import os
-from typing import Dict, List
-
 import boto3
 import botocore
-from pypdf import PdfReader, PdfWriter
 import requests
+from enum import Enum
+from typing import Dict, List
+from datetime import datetime, timezone
+from pypdf import PdfReader, PdfWriter
 
+# SETTINGS VALUES
+LOCAL_PATH_TARGET = "results"
+LOCAL_PATH_ORIGIN = "documents"
 LOGGER_PATH = "logs"
+DEFAULT_CHUNK_SIZE = 2048
+
 # CONFIG LOGGER
 logging.basicConfig(
     level=logging.INFO,
@@ -21,42 +25,56 @@ logging.basicConfig(
         logging.StreamHandler(),
     ],
 )
+# NOTE CAN BE SEPARATED IN DIFFERENT LOG FILES/SEVERAL LOGGER INSTANCES
 logger = logging.getLogger("document_pipeline")
-# CONFIG CLIENTS
-s3_client = boto3.client(
-    "s3", endpoint_url="http://localhost:4566", region_name="eu-west-3"
-)
-dynamodb = boto3.client(
-    "dynamodb", endpoint_url="http://localhost:4566", region_name="eu-west-3"
-)
-sqs_client = boto3.client(
-    "sqs", endpoint_url="http://127.0.0.1:4566", region_name="eu-west-3"
-)
-logs_client = boto3.client(
-    "logs", endpoint_url="http://127.0.0.1:4566", region_name="eu-west-3"
-)
 
-# AWS RESOURCES CONFIG
+
+# AWS RESOURCES CONFIG # NOTE CAN BE DEFINED AS ENV VARIABLES
 REGION_NAME = "eu-west-3"
 S3_BUCKET_NAME = "files-bucket"
+CLASSIFICATION_COMPARTIMENT = "classification"
 SQS_QUEUE_NAME = "files-queue"
-DYNAMODB_TABLE_NAME = "FilesTable"
+DYNAMODB_TABLE_NAME = "files_table"
 LOG_GROUP_NAME = "pipeline_logger"
 LOG_STREAM_NAME = "pipeline_streamer"
 VIRTUAL_HOST_PORT = 4566
-SQS_QUEUE_URL = f"http://sqs.{REGION_NAME}.127.0.0.1.localstack.cloud:{VIRTUAL_HOST_PORT}/000000000000/{SQS_QUEUE_NAME}"
-S3_BUCKET_URL = f"http://{S3_BUCKET_NAME}.s3.{REGION_NAME}.127.0.0.1.localstack.cloud:{VIRTUAL_HOST_PORT}/"
+SQS_QUEUE_URL = f"http://sqs.{REGION_NAME}.localhost.localstack.cloud:{VIRTUAL_HOST_PORT}/000000000000/{SQS_QUEUE_NAME}"
+S3_BUCKET_URL = f"http://{S3_BUCKET_NAME}.s3.{REGION_NAME}.localhost.localstack.cloud:{VIRTUAL_HOST_PORT}/"
+SQS_DLQ_QUEUE_NAME = "files-dlq"
+SQS_DLQ_QUEUE_URL = f"http://sqs.{REGION_NAME}.localhost.localstack.cloud:{VIRTUAL_HOST_PORT}/000000000000/{SQS_DLQ_QUEUE_NAME}"
+
+# CONFIG CLOUD CLIENTS
+s3_client = boto3.client(
+    "s3", endpoint_url="http://localhost:4566", region_name=REGION_NAME
+)
+dynamodb = boto3.client(
+    "dynamodb", endpoint_url="http://localhost:4566", region_name=REGION_NAME
+)
+sqs_client = boto3.client(
+    "sqs", endpoint_url="http://localhost:4566", region_name=REGION_NAME
+)
+logs_client = boto3.client(
+    "logs", endpoint_url="http://localhost:4566", region_name=REGION_NAME
+)
+sqs_client = boto3.client(
+    "sqs", endpoint_url="http://localhost:4566", region_name=REGION_NAME
+)
 
 
-# CODES
+# SQS CODES
 class sqs_codes(Enum):
     NEW_FILE_CODE = "new_file_uploaded"
     OCR_COMPLETED = "file_ocr_completed"
     CLASSIFICATION_COMPLETED = "classification_completed"
 
 
+# DLQ CODES
+class sqs_error_codes(Enum):
+    OCR_FAILED = "orc_failed"
+    CLASSIFICATION_FAILED = "classification_failed"
+
+
 def send_log_to_cloudwatch(message: str) -> None:
-    # timestamp = datetime.now(timezone.utc)
     timestamp = int(datetime.now(timezone.utc).timestamp() * 1000)
     logs_client.put_log_events(
         logGroupName=LOG_GROUP_NAME,
@@ -136,8 +154,7 @@ def clean_aws_resources() -> None:
 
 
 def create_aws_resources() -> None:
-    # response = dynamodb.delete_table(TableName=DYNAMODB_TABLE_NAME)
-
+    # NOTE LOGS JOURNALS CAN BE SEPARATED AND ATTACHED TO A CLOUDWATCH DASHBOARD IF NEEDED
     try:
         logs_client.create_log_group(logGroupName=LOG_GROUP_NAME)
     except logs_client.exceptions.ResourceAlreadyExistsException:
@@ -166,11 +183,27 @@ def create_aws_resources() -> None:
     except sqs_client.exceptions.QueueNameExists:
         pass
     try:
-        table = dynamodb.create_table(
+        # NOTE 1 WCU = 1 KB/S
+        # NOTE 1 RCU = 4 KB/S = 1 SCR = 2 ECR
+        dynamodb.create_table(
             TableName=DYNAMODB_TABLE_NAME,
             KeySchema=[{"AttributeName": "file_id", "KeyType": "HASH"}],
-            AttributeDefinitions=[{"AttributeName": "file_id", "AttributeType": "S"}],
-            ProvisionedThroughput={"ReadCapacityUnits": 5, "WriteCapacityUnits": 5},
+            AttributeDefinitions=[
+                {"AttributeName": "file_id", "AttributeType": "S"},
+                {"AttributeName": "category", "AttributeType": "S"},
+            ],
+            GlobalSecondaryIndexes=[
+                {
+                    "IndexName": "CategoryIndex",
+                    "KeySchema": [{"AttributeName": "category", "KeyType": "HASH"}],
+                    "Projection": {"ProjectionType": "ALL"},
+                    "ProvisionedThroughput": {
+                        "ReadCapacityUnits": 10,
+                        "WriteCapacityUnits": 5,
+                    },
+                }
+            ],
+            ProvisionedThroughput={"ReadCapacityUnits": 10, "WriteCapacityUnits": 5},
         )
     except botocore.exceptions.ClientError as err:
         print("err:", err)
@@ -189,7 +222,7 @@ def send_message_to_sqs(sqs_queue_url: str, data: str) -> None:
 def start_ocr_analysis(filename: str, file_content: bytes) -> List[str]:
     try:
         response = requests.post(
-            "http://127.0.0.1:8000/ocr",
+            "http://localhost:8000/ocr",
             files=[("pdf", (filename, file_content, "application/pdf"))],
         )
         response.raise_for_status()
@@ -204,7 +237,7 @@ def start_ocr_analysis(filename: str, file_content: bytes) -> List[str]:
 
 def send_pages_to_promptflow(pages: List[str]) -> Dict:
     try:
-        response = requests.post("http://127.0.0.1:8000/score", json={"pages": pages})
+        response = requests.post("http://localhost:8000/score", json={"pages": pages})
         response.raise_for_status()
         results = {k: v for k, v in response.json().items() if "segment" in k}
         logger.info(f"Classification received: {results}")
@@ -216,8 +249,8 @@ def send_pages_to_promptflow(pages: List[str]) -> Dict:
         return {}
 
 
-def save_classification(
-    filename: str, file_content: bytes, classification: Dict, target_folder: Dict
+def save_classification_segments(
+    filename: str, file_content: bytes, classification: Dict
 ) -> None:
     try:
         pdf = PdfReader(io.BytesIO(file_content))
@@ -227,14 +260,23 @@ def save_classification(
             while page <= segment["pages"][1]:
                 writer.add_page(pdf.pages[page - 1])
                 page += 1
-            output_path = f"{target_folder}/{filename}_{segment['categorie']}_{segment['pages'][0]}-{segment['pages'][1]}.pdf"
+            output_path = f"{LOCAL_PATH_TARGET}/{filename}_{segment['categorie']}_{segment['pages'][0]}-{segment['pages'][1]}.pdf"
             with open(
                 output_path,
                 "wb",
             ) as f:
                 writer.write(f)
-                logger.info(f"Saved classified segment: {output_path}")
-                send_log_to_cloudwatch(f"Saved classified segment: {output_path}")
+                logger.info(f"Saved classified segment locally: {output_path}")
+                send_log_to_cloudwatch(
+                    f"Saved classified segment locally: {output_path}"
+                )
+                upload_file_to_s3(
+                    file_content,
+                    f"{CLASSIFICATION_COMPARTIMENT}/{filename}_{segment['categorie']}_{segment['pages'][0]}-{segment['pages'][1]}.pdf",
+                )
+                logger.info(f"Saved classified segment on s3: {output_path}")
+                send_log_to_cloudwatch(f"Saved classified segment on s3: {output_path}")
+
     except Exception as err:
         logger.error(f"Failed to save classified PDF for {filename}: {str(err)}")
         send_log_to_cloudwatch(
@@ -249,7 +291,7 @@ def get_folder_files(folder_path: str) -> List[str]:
 def start_ocr_analysis(filename: str, file_content: bytes) -> List[str]:
     try:
         response = requests.post(
-            "http://127.0.0.1:8000/ocr",
+            "http://localhost:8000/ocr",
             files=[("pdf", (filename, file_content, "application/pdf"))],
         )
         response.raise_for_status()
