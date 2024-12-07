@@ -35,8 +35,8 @@ def classification_workflow() -> None:
                     continue
                 body = json.loads(body)
                 if sqs_codes.OCR_COMPLETED.value in body:
-                    file_id = body[sqs_codes.NEW_FILE_CODE.value].get("file_id")
-                    file_key = body[sqs_codes.NEW_FILE_CODE.value].get("file_key")
+                    file_id = body[sqs_codes.OCR_COMPLETED.value].get("file_id")
+                    file_key = body[sqs_codes.OCR_COMPLETED.value].get("file_key")
                     if not file_id or not file_key:
                         send_log_to_cloudwatch(
                             f"malformed SQS message for file: file_id:{file_id}, file_key:{file_key} message deleted"
@@ -85,7 +85,7 @@ def classification_workflow() -> None:
                             {
                                 "file_id": {"S": file_id},
                                 "sort_key": {
-                                    "S": f"{seg['categorie']}#{segment_index}"
+                                    "S": f"{seg['categorie']} {segment_index}"
                                 },
                                 "category": {"S": seg["categorie"]},
                                 "pages": {"L": [{"N": str(p)} for p in seg["pages"]]},
@@ -101,7 +101,7 @@ def classification_workflow() -> None:
                             {
                                 "file_id": {"S": file_id},
                                 "sort_key": {
-                                    "S": f"{seg['categorie']}#{segment_index}"
+                                    "S": f"{seg['categorie']} {segment_index}"
                                 },
                                 "category": {"S": seg["categorie"]},
                                 "pages": {"L": [{"N": str(p)} for p in seg["pages"]]},

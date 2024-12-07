@@ -9,10 +9,17 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "listen_file_reception",
+            "name": "classification_worker",
             "type": "debugpy",
             "request": "launch",
-            "program": "listen_file_reception.py",
+            "program": "classification_worker.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "ocr_worker",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "ocr_worker.py",
             "console": "integratedTerminal"
         },
         {

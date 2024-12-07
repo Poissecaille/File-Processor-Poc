@@ -7,5 +7,4 @@ echo "Launch CLASSIFICATION listener..."
 python3.10 classification_worker.py &
 
 echo "Lancement client CLI..."
-python3.10 main.py --files documents/test_1.pdf documents/test_2.pdf "--clean" "--create"
-
+python3.10 main.py --files documents/test_1.pdf documents/test_2.pdf "--create"
