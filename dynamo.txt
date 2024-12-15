@@ -1,0 +1,22 @@
+awslocal dynamodb scan --table-name 'files_table'
+
+awslocal dynamodb get-item  \
+    --table-name 'files_table' \
+    --key '{"file_id": {"S": "e1c54155-1353-43d2-962e-ccbb9e4b4614"}}'
+
+# awslocal dynamodb get-item   \
+#     --table-name 'files_table' \
+#     --key '{"file_id": {"S": "e1c54155-1353-43d2-962e-ccbb9e4b4614"}, ...}'
+
+aws dynamodb query \
+    --table-name files_table \
+    --key-condition-expression "file_id = :file_id" \
+    --expression-attribute-values '{":file_id":{"S":"e1c54155-1353-43d2-962e-ccbb9e4b4614"}}' \
+    --endpoint-url http://localhost:4566
+
+aws dynamodb query \
+    --table-name files_table \
+    --index-name CategoryIndex \
+    --key-condition-expression "category = :category" \
+    --expression-attribute-values '{":category":{"S":"diagnostic"}}' \
+    --endpoint-url http://localhost:4566

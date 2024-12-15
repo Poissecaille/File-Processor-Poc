@@ -78,6 +78,8 @@ def ocr_workflow() -> None:
                     expression_attributes = {
                         ":ocr": {"L": [{"S": page} for page in pages]}
                     }
+                    # NOTE peut etre plus intéressant de faire un put_item avec une clé de liaison entre le file_id et les pages
+                                          
                     update_dynamo_table_item(
                         file_id, update_expression, expression_attributes
                     )

@@ -119,29 +119,30 @@ def clean_aws_resources() -> None:
     try:
         dynamodb.delete_table(TableName=DYNAMODB_TABLE_NAME)
         logger.info(f"Table {DYNAMODB_TABLE_NAME} deleted.")
-        send_log_to_cloudwatch(f"Table {DYNAMODB_TABLE_NAME} deleted.")
+        # send_log_to_cloudwatch(f"Table {DYNAMODB_TABLE_NAME} deleted.")
     except dynamodb.exceptions.ResourceNotFoundException:
         logger.info(f"Table {DYNAMODB_TABLE_NAME} does not exist.")
-        send_log_to_cloudwatch(f"Table {DYNAMODB_TABLE_NAME} does not exist.")
-
+        # send_log_to_cloudwatch(f"Table {DYNAMODB_TABLE_NAME} does not exist.")
+        pass
     try:
         queue_url_response = sqs_client.get_queue_url(QueueName=SQS_QUEUE_NAME)
         sqs_client.delete_queue(QueueUrl=queue_url_response["QueueUrl"])
         logger.info(f"Queue {SQS_QUEUE_NAME} deleted.")
-        send_log_to_cloudwatch(f"Queue {SQS_QUEUE_NAME} deleted.")
-
+        # send_log_to_cloudwatch(f"Queue {SQS_QUEUE_NAME} deleted.")
+        pass
     except sqs_client.exceptions.QueueDoesNotExist:
         logger.info(f"Queue {SQS_QUEUE_NAME} does not exist.")
-        send_log_to_cloudwatch(f"Queue {SQS_QUEUE_NAME} does not exist.")
+        # send_log_to_cloudwatch(f"Queue {SQS_QUEUE_NAME} does not exist.")
+        pass
     try:
         queue_url_response = sqs_client.get_queue_url(QueueName=SQS_DLQ_QUEUE_NAME)
         sqs_client.delete_queue(QueueUrl=queue_url_response["QueueUrl"])
         logger.info(f"Queue {SQS_DLQ_QUEUE_NAME} deleted.")
-        send_log_to_cloudwatch(f"Queue {SQS_DLQ_QUEUE_NAME} deleted.")
+        # send_log_to_cloudwatch(f"Queue {SQS_DLQ_QUEUE_NAME} deleted.")
     except sqs_client.exceptions.QueueDoesNotExist:
         logger.info(f"Queue {SQS_DLQ_QUEUE_NAME} does not exist.")
-        send_log_to_cloudwatch(f"Queue {SQS_DLQ_QUEUE_NAME} does not exist.")
-
+        # send_log_to_cloudwatch(f"Queue {SQS_DLQ_QUEUE_NAME} does not exist.")
+        pass
     try:
         bucket = s3_client.list_objects(Bucket=S3_BUCKET_NAME)
         objects = [{"Key": obj["Key"]} for obj in bucket.get("Contents", [])]
@@ -149,10 +150,12 @@ def clean_aws_resources() -> None:
             s3_client.delete_objects(Bucket=S3_BUCKET_NAME, Delete={"Objects": objects})
         s3_client.delete_bucket(Bucket=S3_BUCKET_NAME)
         logger.info(f"Bucket {S3_BUCKET_NAME} and all its contents deleted.")
-        send_log_to_cloudwatch(f"Bucket {S3_BUCKET_NAME} and all its contents deleted.")
+       # send_log_to_cloudwatch(f"Bucket {S3_BUCKET_NAME} and all its contents deleted.")
+        pass
     except s3_client.exceptions.NoSuchBucket:
         logger.info(f"Bucket {S3_BUCKET_NAME} does not exist.")
-        send_log_to_cloudwatch(f"Bucket {S3_BUCKET_NAME} does not exist.")
+        # send_log_to_cloudwatch(f"Bucket {S3_BUCKET_NAME} does not exist.")
+        pass
 
     try:
         streams = logs_client.describe_log_streams(logGroupName=LOG_STREAM_NAME)[
@@ -164,23 +167,24 @@ def clean_aws_resources() -> None:
             )
         logs_client.delete_log_group(logGroupName=LOG_STREAM_NAME)
         logger.info(f"Log stream {LOG_STREAM_NAME} and all its streams deleted.")
-        send_log_to_cloudwatch(
-            f"Log stream {LOG_STREAM_NAME} and all its streams deleted."
-        )
+        # send_log_to_cloudwatch(
+        #     f"Log stream {LOG_STREAM_NAME} and all its streams deleted."
+        # )
+        pass
     except logs_client.exceptions.ResourceNotFoundException:
         logger.info(f"Log stream {LOG_STREAM_NAME} does not exist.")
-        send_log_to_cloudwatch(f"Log stream {LOG_STREAM_NAME} does not exist.")
-
+        # send_log_to_cloudwatch(f"Log stream {LOG_STREAM_NAME} does not exist.")
+        pass
 
 def create_aws_resources() -> None:
     # NOTE LOGS JOURNALS CAN BE SEPARATED AND ATTACHED TO A CLOUDWATCH DASHBOARD IF NEEDED
     try:
         logs_client.create_log_group(logGroupName=LOG_GROUP_NAME)
         logger.info(f"Log group {LOG_GROUP_NAME} created")
-        send_log_to_cloudwatch(f"Log group {LOG_GROUP_NAME} created")
+        # send_log_to_cloudwatch(f"Log group {LOG_GROUP_NAME} created")
     except logs_client.exceptions.ResourceAlreadyExistsException:
         logger.info(f"Log group {LOG_GROUP_NAME} already created")
-        send_log_to_cloudwatch(f"Log group {LOG_GROUP_NAME} already created")
+        # send_log_to_cloudwatch(f"Log group {LOG_GROUP_NAME} already created")
         pass
 
     try:
@@ -188,10 +192,10 @@ def create_aws_resources() -> None:
             logGroupName=LOG_GROUP_NAME, logStreamName=LOG_STREAM_NAME
         )
         logger.info(f"Log group {LOG_GROUP_NAME} created")
-        send_log_to_cloudwatch(f"Log group {LOG_GROUP_NAME} created")
+        # send_log_to_cloudwatch(f"Log group {LOG_GROUP_NAME} created")
     except logs_client.exceptions.ResourceAlreadyExistsException:
         logger.info(f"Log stream {LOG_STREAM_NAME} already created")
-        send_log_to_cloudwatch(f"Log stream {LOG_STREAM_NAME} already created")
+        # send_log_to_cloudwatch(f"Log stream {LOG_STREAM_NAME} already created")
         pass
 
     try:
@@ -200,32 +204,33 @@ def create_aws_resources() -> None:
             CreateBucketConfiguration={"LocationConstraint": "eu-west-3"},
         )
         logger.info(f"bucket {S3_BUCKET_NAME} created")
-        send_log_to_cloudwatch(f"bucket {S3_BUCKET_NAME} created")
+        pass
+        # send_log_to_cloudwatch(f"bucket {S3_BUCKET_NAME} created")
     except (
         s3_client.exceptions.BucketAlreadyExists,
         s3_client.exceptions.BucketAlreadyOwnedByYou,
     ):
         logger.info(f"bucket {S3_BUCKET_NAME} already created")
-        send_log_to_cloudwatch(f"bucket {S3_BUCKET_NAME} already created")
+        # send_log_to_cloudwatch(f"bucket {S3_BUCKET_NAME} already created")
         pass
 
     try:
         sqs_client.create_queue(QueueName=SQS_QUEUE_NAME)
         logger.info(f"queue: {SQS_QUEUE_NAME} created")
-        send_log_to_cloudwatch(f"queue: {SQS_QUEUE_NAME} created")
+        # send_log_to_cloudwatch(f"queue: {SQS_QUEUE_NAME} created")
     except sqs_client.exceptions.QueueNameExists:
         logger.info(f"queue {SQS_QUEUE_NAME} already created")
-        send_log_to_cloudwatch(f"queue {SQS_QUEUE_NAME} already created")
+        # send_log_to_cloudwatch(f"queue {SQS_QUEUE_NAME} already created")
         pass
 
     try:
         sqs_client.create_queue(QueueName=SQS_DLQ_QUEUE_NAME)
         logger.info(f"queue: {SQS_DLQ_QUEUE_NAME} created")
-        send_log_to_cloudwatch(f"queue: {SQS_DLQ_QUEUE_NAME} created")
+        # send_log_to_cloudwatch(f"queue: {SQS_DLQ_QUEUE_NAME} created")
 
     except sqs_client.exceptions.QueueNameExists:
         logger.info(f"queue {SQS_DLQ_QUEUE_NAME} already created")
-        send_log_to_cloudwatch(f"queue {SQS_DLQ_QUEUE_NAME} already created")
+        #   send_log_to_cloudwatch(f"queue {SQS_DLQ_QUEUE_NAME} already created")
         pass
 
     try:
@@ -253,8 +258,8 @@ def create_aws_resources() -> None:
         )
     except botocore.exceptions.ClientError as err:
         logger.info(f"error during table creation: {err}")
-        send_log_to_cloudwatch(f"error during table creation: {err}")
-
+        # send_log_to_cloudwatch(f"error during table creation: {err}")
+        pass
 
 def send_message_to_sqs(sqs_queue_url: str, data: str) -> None:
     response = sqs_client.send_message(
